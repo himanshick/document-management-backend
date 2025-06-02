@@ -1,31 +1,48 @@
-# app/api/user_routes.py
+import logging
+from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm, OAuth2PasswordBearer
 from jose import JWTError
+
 from app.models.user import UserCreate, Token, TokenData, UserInDB
 from app.services.user_service import register_user, authenticate_user, get_all_users, get_user_by_id
 from app.core.auth import decode_access_token
-from typing import List
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/users/login")
 
-@router.get("/", response_model=List[UserInDB])
-async def list_users(token: str = Depends(oauth2_scheme)):
+
+async def get_current_user(token: str = Depends(oauth2_scheme)) -> TokenData:
     try:
         payload: TokenData = decode_access_token(token)
-        # if payload.role != "Admin":
-        #     raise HTTPException(status_code=403, detail="Access forbidden")
+        if not payload.sub or not payload.role:
+            logger.warning("Invalid token payload, missing user ID or role")
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload")
+        return payload
+    except JWTError as e:
+        logger.warning(f"JWT decode error: {e}")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token")
 
-        return await get_all_users()
-    except JWTError:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+async def require_admin(user: TokenData = Depends(get_current_user)) -> TokenData:
+    if user.role != "Admin":
+        logger.warning(f"User {user.sub} with role {user.role} attempted admin-only operation")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access forbidden")
+    return user
 
 
-@router.post("/register", status_code=201)
+@router.get("/", response_model=List[UserInDB])
+async def list_users(admin_user: TokenData = Depends(require_admin)):
+    # Only admins can list users
+    return await get_all_users()
+
+
+@router.post("/register", status_code=status.HTTP_201_CREATED, response_model=UserInDB)
 async def register(user: UserCreate):
     return await register_user(user)
+
 
 @router.post("/login", response_model=Token)
 async def login(form_data: OAuth2PasswordRequestForm = Depends()):
@@ -33,37 +50,14 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
 
 
 @router.get("/whoami", response_model=TokenData)
-async def get_current_user_info(token: str = Depends(oauth2_scheme)):
-    try:
-        payload: TokenData = decode_access_token(token)
-
-        user_id: str = payload.sub
-        role: str = payload.role
-
-        if user_id is None or role is None:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid token payload"
-            )
-
-        return TokenData(sub=user_id, role=role)
-
-    except JWTError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired token"
-        )
-    except Exception:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid token payload format"
-        )
-
+async def get_current_user_info(current_user: TokenData = Depends(get_current_user)):
+    return current_user
 
 
 @router.get("/{user_id}", response_model=UserInDB)
-async def get_user(user_id: str):
+async def get_user(user_id: str, current_user: TokenData = Depends(get_current_user)):
     user = await get_user_by_id(user_id)
     if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+        logger.info(f"User with id {user_id} not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     return user

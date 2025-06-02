@@ -9,3 +9,5 @@ pytest-asyncio==0.21.0
 python-dotenv==1.0.0
 pymongo==3.12.3
 python-multipart
+httpx
+pytest-mock

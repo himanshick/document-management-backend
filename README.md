@@ -22,6 +22,7 @@
  │   ├── ingestion/             -- Ingestion logic (microservice)
  │   │   └── worker.py
  │   ├── tests/                 -- Unit tests
+ │   │   ├── constants.py
  │   │   ├── test_user.py
  │   │   ├── test_document.py
  │   │   └── test_ingestion.py
@@ -57,7 +58,7 @@ git clone <repo_url>
 cd backend
 docker-compose up --build
 ```
-Access the API at: `http://localhost:8000/docs`
+Access the API at: `http://localhost:8000/api/v1/docs`
 
 ## Running Tests
 ```bash
@@ -91,12 +92,12 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 5. *** Access the API docs ***
 ```bash 
-http://localhost:8000/docs
+http://localhost:8000/api/v1/docs
 ```
 
 6. *** Run Tests ***
 ```bash 
-pytest
+PYTHONPATH=./app pytest
 ```
 
 

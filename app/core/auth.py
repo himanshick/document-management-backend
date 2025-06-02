@@ -5,6 +5,9 @@ from passlib.context import CryptContext
 
 from app.models.user import TokenData
 from app.core.config import settings
+from app.core.logger import get_logger
+
+logger = get_logger()
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -24,5 +27,6 @@ def decode_access_token(token: str) -> Optional[TokenData]:
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         return TokenData(**payload)
-    except JWTError:
+    except JWTError as e:
+        get_logger().error(f"JWT decode failed: {e}")
         return None

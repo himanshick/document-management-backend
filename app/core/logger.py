@@ -1,6 +1,7 @@
 import logging
 from logging.handlers import RotatingFileHandler
 import sys
+from app.core.config import settings
 
 class SingletonLogger:
     _instance = None
@@ -22,7 +23,7 @@ class SingletonLogger:
 
             # File handler (rotating logs)
             file_handler = RotatingFileHandler(
-                "app.log", maxBytes=10*1024*1024, backupCount=5
+                settings.LOG_FILE or "app.log", maxBytes=10*1024*1024, backupCount=5
             )
             file_handler.setLevel(logging.INFO)
             file_formatter = logging.Formatter(
